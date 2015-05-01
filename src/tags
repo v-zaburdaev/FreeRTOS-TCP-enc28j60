@@ -1,0 +1,38 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.8	//
+AHBPrescTable	system_stm32f4xx.c	/^  __I uint8_t AHBPrescTable[16] = {0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 6, 7, 8, 9};$/;"	v
+BusFault_Handler	stm32f4xx_it.c	/^void BusFault_Handler(void)$/;"	f
+CopyDataInit	startup_stm32f407xx.s	/^CopyDataInit:$/;"	l
+DebugMon_Handler	stm32f4xx_it.c	/^void DebugMon_Handler(void)$/;"	f
+Default_Handler	startup_stm32f407xx.s	/^Default_Handler:$/;"	l
+FillZerobss	startup_stm32f407xx.s	/^FillZerobss:$/;"	l
+HAL_MspDeInit	stm32f4xx_hal_msp.c	/^void HAL_MspDeInit(void)$/;"	f
+HAL_MspInit	stm32f4xx_hal_msp.c	/^void HAL_MspInit(void)$/;"	f
+HSE_VALUE	system_stm32f4xx.c	70;"	d	file:
+HSI_VALUE	system_stm32f4xx.c	74;"	d	file:
+HardFault_Handler	stm32f4xx_it.c	/^void HardFault_Handler(void)$/;"	f
+Infinite_Loop	startup_stm32f407xx.s	/^Infinite_Loop:$/;"	l
+LoopCopyDataInit	startup_stm32f407xx.s	/^LoopCopyDataInit:$/;"	l
+LoopFillZerobss	startup_stm32f407xx.s	/^LoopFillZerobss:$/;"	l
+MemManage_Handler	stm32f4xx_it.c	/^void MemManage_Handler(void)$/;"	f
+NMI_Handler	stm32f4xx_it.c	/^void NMI_Handler(void)$/;"	f
+Reset_Handler	startup_stm32f407xx.s	/^Reset_Handler:  $/;"	l
+STM32F407xx	system_stm32f4xx.c	66;"	d	file:
+SysTick_Handler	stm32f4xx_it.c	/^void SysTick_Handler(void)$/;"	f
+SystemClock_Config	system_config.cpp	/^void SystemClock_Config()$/;"	f
+SystemCoreClock	system_stm32f4xx.c	/^  uint32_t SystemCoreClock = 16000000;$/;"	v
+SystemCoreClockUpdate	system_stm32f4xx.c	/^void SystemCoreClockUpdate(void)$/;"	f
+SystemInit	system_stm32f4xx.c	/^void SystemInit(void)$/;"	f
+UsageFault_Handler	stm32f4xx_it.c	/^void UsageFault_Handler(void)$/;"	f
+VECT_TAB_OFFSET	system_stm32f4xx.c	98;"	d	file:
+__initialized	Leds.cpp	/^bool Leds::__initialized = false;/;"	m	class:Leds	file:
+g_pfnVectors	startup_stm32f407xx.s	/^g_pfnVectors:$/;"	l
+initialize	Leds.cpp	/^void Leds::initialize() {$/;"	f	class:Leds
+main	main.cpp	/^int main()$/;"	f
+turn_off	Leds.cpp	/^void Leds::turn_off(std::initializer_list<Led> leds) {$/;"	f	class:Leds
+turn_on	Leds.cpp	/^void Leds::turn_on(std::initializer_list<Led> leds) {$/;"	f	class:Leds
+vLedTask	main.cpp	/^void vLedTask(void *args)$/;"	f

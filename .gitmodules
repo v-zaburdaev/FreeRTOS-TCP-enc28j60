@@ -1,0 +1,6 @@
+[submodule "lib/stm32cubef4"]
+	path = lib/stm32cubef4
+	url = https://github.com/Plytirex/stm32cubef4.git
+[submodule "lib/FreeRTOS"]
+	path = lib/FreeRTOS
+	url = https://github.com/Plytirex/FreeRTOS.git
