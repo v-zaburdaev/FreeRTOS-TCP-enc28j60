@@ -26,7 +26,7 @@ void enc28j60_bfc(uint8_t adr, uint8_t mask); // Clr bits (reg &= ~mask)
 void enc28j60_bfs(uint8_t adr, uint8_t mask); // Set bits (reg |= mask)
 
 // R/W Rx/Tx buffer
-void enc28j60_read_buffer(uint8_t *buf, uint16_t len);
+void enc28j60_read_buffer(volatile uint8_t *buf, uint16_t len);
 void enc28j60_write_buffer(uint8_t *buf, uint16_t len);
 
 // R/W PHY reg
