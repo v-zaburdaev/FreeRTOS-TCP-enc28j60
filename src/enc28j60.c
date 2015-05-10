@@ -3,16 +3,14 @@
 #include "stm32f4xx_hal.h"
 #include "debug.hpp"
 
+static void enc28j60_select();
+static void enc28j60_release();
+static void enc28j60_soft_reset();
+static uint8_t enc28j60_txrx_byte(uint8_t data);
+static uint8_t enc28j60_read_op(uint8_t cmd, uint8_t adr);
+static void enc28j60_write_op(uint8_t cmd, uint8_t adr, uint8_t data);
 
-static void enc28j60_select()
-{
-    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_RESET);
-}
 
-static void enc28j60_release()
-{
-    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET);
-}
 
 volatile uint8_t enc28j60_current_bank = 0;
 volatile uint16_t enc28j60_rxrdpt = 0;
@@ -217,7 +215,17 @@ void enc28j60_init(uint8_t *macadr)
     
 }
 
-void enc28j60_soft_reset()
+static void enc28j60_select()
+{
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_RESET);
+}
+
+static void enc28j60_release()
+{
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET);
+}
+
+static void enc28j60_soft_reset()
 {
 	enc28j60_select();
 	enc28j60_txrx_byte(ENC28J60_SPI_SC);
@@ -342,7 +350,7 @@ void enc28j60_bfs(uint8_t adr, uint8_t mask)
 	enc28j60_write_op(ENC28J60_SPI_BFS, adr, mask);
 }
 
-uint8_t enc28j60_txrx_byte(uint8_t data)
+static uint8_t enc28j60_txrx_byte(uint8_t data)
 {
     /*
 	while(SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE)==RESET);
@@ -389,7 +397,7 @@ void enc28j60_write_buffer(uint8_t *buf, uint16_t len)
 }
 
 // Generic SPI read command
-uint8_t enc28j60_read_op(uint8_t cmd, uint8_t adr)
+static uint8_t enc28j60_read_op(uint8_t cmd, uint8_t adr)
 {
 	uint8_t data;
 
@@ -403,7 +411,7 @@ uint8_t enc28j60_read_op(uint8_t cmd, uint8_t adr)
 }
 
 // Generic SPI write command
-void enc28j60_write_op(uint8_t cmd, uint8_t adr, uint8_t data)
+static void enc28j60_write_op(uint8_t cmd, uint8_t adr, uint8_t data)
 {
 	enc28j60_select();
 	enc28j60_txrx_byte(cmd | (adr & ENC28J60_ADDR_MASK));
