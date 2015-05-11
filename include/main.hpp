@@ -6,6 +6,7 @@
 #include "Leds.hpp"
 #include "interrupts.hpp"
 #include "FreeRTOS.h"
+#include "FreeRTOS_IP.h"
 #include "task.h"
 #include "handlers.hpp"
 

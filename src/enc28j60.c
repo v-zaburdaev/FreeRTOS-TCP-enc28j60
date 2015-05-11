@@ -1,7 +1,8 @@
 #include "enc28j60.h"
 
 #include "stm32f4xx_hal.h"
-#include "debug.hpp"
+
+#define debug(format, ...)     printf(format,##__VA_ARGS__)
 
 static void enc28j60_select();
 static void enc28j60_release();
@@ -17,7 +18,7 @@ volatile uint16_t enc28j60_rxrdpt = 0;
 
 SPI_HandleTypeDef SpiHandle;
 
-void enc28j60_init(uint8_t *macadr)
+uint8_t enc28j60_init(uint8_t *macadr)
 {
 	uint32_t i;
     /*
@@ -153,9 +154,8 @@ void enc28j60_init(uint8_t *macadr)
     if(HAL_SPI_Init(&SpiHandle) != HAL_OK)
     {
         /* Initialization Error */
-        debug("PANIC: SPI initialization error at %s, line %d .\n", __FILE__, __LINE__);
-        while(1)
-            ;
+        debug("SPI: initialization error at %s, line %d .\n", __FILE__, __LINE__);
+        return 1;
     }
 
     /*
@@ -213,6 +213,7 @@ void enc28j60_init(uint8_t *macadr)
     // Enable Rx packets
     enc28j60_bfs(ECON1, ECON1_RXEN);
     
+    return 0;
 }
 
 static void enc28j60_select()
@@ -261,16 +262,19 @@ void enc28j60_send_packet(uint8_t *data, uint16_t len)
 
 uint16_t enc28j60_recv_packet(uint8_t *buf, uint16_t buflen)
 {
+    debug("enc28j60: trying to receive packet\n");
 	uint16_t len = 0, rxlen, status, temp;
 
 	if(enc28j60_rcr(EPKTCNT))
 	{
+        debug("enc28j60: received packet. ");
 		enc28j60_wcr16(ERDPT, enc28j60_rxrdpt);
 
 		enc28j60_read_buffer((void *)(&enc28j60_rxrdpt), sizeof(enc28j60_rxrdpt));
 		enc28j60_read_buffer((void *)(&rxlen), sizeof(rxlen));
 		enc28j60_read_buffer((void *)(&status), sizeof(status));
 
+        debug("enc28j60_rxrdpt = %d, rxlen = %d, status = %d\n", enc28j60_rxrdpt, rxlen, status);
 		if(status & 0x80) //success
 		{
 			len = rxlen - 4; //throw out crc
@@ -284,7 +288,9 @@ uint16_t enc28j60_recv_packet(uint8_t *buf, uint16_t buflen)
 
 		// Decrement packet counter
 		enc28j60_bfs(ECON2, ECON2_PKTDEC);
-	}
+	} else {
+        debug("enc28j60: packet not found\n");
+    }
 
 	return len;
 }
@@ -365,10 +371,10 @@ static uint8_t enc28j60_txrx_byte(uint8_t data)
         case HAL_OK:  
             break;  
         case HAL_TIMEOUT:
-            debug("PANIC: SPI transmit/receive timeout occured at %s, line %d .\n", __FILE__, __LINE__);
+            debug("SPI: transmit/receive timeout occured at %s, line %d .\n", __FILE__, __LINE__);
             break;  
         case HAL_ERROR:
-            debug("PANIC: SPI transmit/receive error at %s, line %d.\n", __FILE__, __LINE__);
+            debug("SPI: transmit/receive error at %s, line %d.\n", __FILE__, __LINE__);
             break;
         default:
             break;

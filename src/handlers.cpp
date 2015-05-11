@@ -1,5 +1,6 @@
 #include "handlers.hpp"
 
+int click_counter = 0;
 
 extern "C" {
     void vApplicationStackOverflowHook(TaskHandle_t xTask, signed char *pcTaskName) {
@@ -26,13 +27,10 @@ extern "C" {
 
 void EXTI0_IRQHandlerCpp()
 {
-    static int button_click_counter = 0;
-    for (int i = 0; i <= 1000000; i++);
-    for (int i = 0; i <= 1000000; i++);
-    for (int i = 0; i <= 1000000; i++);
-    for (int i = 0; i <= 1000000; i++);
-    for (int i = 0; i <= 1000000; i++);
-    button_click_counter++;
-    debug("Button pressed %d times.", button_click_counter);
+    static uint32_t tickstart = 0;
+    if((HAL_GetTick() - tickstart) > 50) {
+        click_counter++;
+        tickstart = HAL_GetTick();
+    }
 
 }

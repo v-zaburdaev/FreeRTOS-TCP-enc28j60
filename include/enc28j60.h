@@ -1,4 +1,9 @@
-#pragma once
+#ifndef ENC28J60_H
+#define ENC28J60_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include <stdint.h>
 
@@ -11,7 +16,7 @@
 //#define ENC28J60_SPI_SCK	(1<<PB7)
 
 // Init ENC28J60
-void enc28j60_init(uint8_t *macadr);
+uint8_t enc28j60_init(uint8_t *macadr);
 
 // Snd/Rcv packets
 void enc28j60_send_packet(uint8_t *data, uint16_t len);
@@ -422,3 +427,9 @@ void enc28j60_write_phy(uint8_t adr, uint16_t data);
 #define PHLCON_LFRQ1		0x0008
 #define PHLCON_LFRQ0		0x0004
 #define PHLCON_STRCH		0x0002
+
+#ifdef __cplusplus
+} // extern "C"
+#endif
+
+#endif /* end of include guard: ENC28J60_H */
