@@ -15,6 +15,8 @@ extern "C" {
 //#define ENC28J60_SPI_MISO	(1<<PB6)
 //#define ENC28J60_SPI_SCK	(1<<PB7)
 
+extern volatile uint16_t enc28j60_rxrdpt; 
+
 // Init ENC28J60
 uint8_t enc28j60_init(uint8_t *macadr);
 
@@ -43,7 +45,7 @@ void enc28j60_write_phy(uint8_t adr, uint16_t data);
 #define ENC28J60_RXSIZE		0x1A00
 #define ENC28J60_BUFEND		(ENC28J60_BUFSIZE-1)
 
-#define ENC28J60_MAXFRAME	1500
+#define ENC28J60_MAXFRAME	1518
 
 #define ENC28J60_RXSTART	0
 #define ENC28J60_RXEND		(ENC28J60_RXSIZE-1)

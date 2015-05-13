@@ -72,8 +72,8 @@ uint8_t enc28j60_init(uint8_t *macadr)
     // Initialize MISO
 
 	GPIO_InitStruct.Pin       = GPIO_PIN_14;
-    GPIO_InitStruct.Mode      = GPIO_MODE_INPUT;    // ICE: official examples show another way of configuration
-    GPIO_InitStruct.Pull      = GPIO_PULLUP;
+    GPIO_InitStruct.Mode      = GPIO_MODE_AF_PP;    // ICE: official examples show another way of configuration
+    //GPIO_InitStruct.Pull      = GPIO_PULLUP;
     //GPIO_InitStruct.Speed     = GPIO_SPEED_FAST;
     //GPIO_InitStruct.Alternate = GPIO_AF5_SPI2;
 
@@ -167,6 +167,7 @@ uint8_t enc28j60_init(uint8_t *macadr)
        */
 
        enc28j60_release();
+       
        for (i = 0; i < 720000; i++) {
            HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET);
        }
@@ -184,17 +185,19 @@ uint8_t enc28j60_init(uint8_t *macadr)
     enc28j60_wcr16(ERXRDPT, ENC28J60_RXSTART);
     enc28j60_wcr16(ERXND, ENC28J60_RXEND);
     enc28j60_rxrdpt = ENC28J60_RXSTART;
+    
 
     // Setup MAC
     enc28j60_wcr(MACON1, MACON1_TXPAUS| // Enable flow control
     MACON1_RXPAUS|MACON1_MARXEN); // Enable MAC Rx
-    enc28j60_wcr(MACON2, 0); // Clear reset
-    enc28j60_wcr(MACON3, MACON3_PADCFG0| // Enable padding,
-    MACON3_TXCRCEN|MACON3_FRMLNEN|MACON3_FULDPX); // Enable crc & frame len chk
+    //enc28j60_wcr(MACON2, 0); // Clear reset
+    enc28j60_wcr(MACON3, 
+            MACON3_PADCFG0 | MACON3_PADCFG1 | MACON3_PADCFG2 | // Enable padding,
+            MACON3_TXCRCEN | MACON3_FRMLNEN | MACON3_FULDPX); // Enable crc & frame len chk
     enc28j60_wcr16(MAMXFL, ENC28J60_MAXFRAME);
     enc28j60_wcr(MABBIPG, 0x15); // Set inter-frame gap
     enc28j60_wcr(MAIPGL, 0x12);
-    enc28j60_wcr(MAIPGH, 0x0c);
+    enc28j60_wcr(MAIPGH, 0x0c); // ICE
     enc28j60_wcr(MAADR5, macadr[0]); // Set MAC address
     enc28j60_wcr(MAADR4, macadr[1]);
     enc28j60_wcr(MAADR3, macadr[2]);
@@ -211,6 +214,8 @@ uint8_t enc28j60_init(uint8_t *macadr)
     PHLCON_LFRQ0|PHLCON_STRCH);
 
     // Enable Rx packets
+    //enc28j60_wcr(ERXFCON, 0x9F); // filtering
+    enc28j60_bfc(EIE, EIE_PKTIE | EIE_INTIE);
     enc28j60_bfs(ECON1, ECON1_RXEN);
     
     return 0;
