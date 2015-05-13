@@ -71,16 +71,17 @@ int main()
     SystemClock_Config();
     
 
-//    FreeRTOS_IPInit( ucIPAddress,
-//                     ucNetMask,
-//                     ucGatewayAddress,
-//                     ucDNSServerAddress,
-//                     ucMACAddress );
- uint8_t arp_req[] = {
-       0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x08, 0x06, 0x00, 0x01,
-       0x08, 0x00, 0x06, 0x04, 0x00, 0x01, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0xc0, 0xa8, 0x00, 0x02,
-       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0xa8, 0x00, 0x01
-   }; 
+    FreeRTOS_IPInit( ucIPAddress,
+                     ucNetMask,
+                     ucGatewayAddress,
+                     ucDNSServerAddress,
+                     ucMACAddress );
+    /* arp testing 
+    uint8_t arp_req[] = {
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x08, 0x06, 0x00, 0x01,
+        0x08, 0x00, 0x06, 0x04, 0x00, 0x01, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0xc0, 0xa8, 0x00, 0x02,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0xa8, 0x00, 0x01
+    }; 
 
     debug("enc28j60: init\n");
     enc28j60_init(ucMACAddress);
@@ -92,25 +93,25 @@ int main()
             enc28j60_rcr(MAADR2), enc28j60_rcr(MAADR1), enc28j60_rcr(MAADR0),
             enc28j60_rcr(ERXFCON));
 
-   /* arp testing */
-   uint8_t network_buf[256] = {0};
-   int length;
-   for (;;) {
-       HAL_Delay(1000);
-           debug("Sending arp...\n");
-           enc28j60_send_packet(arp_req, sizeof(arp_req));
-           length = enc28j60_recv_packet(network_buf, sizeof(network_buf));
-           debug("Received response (len: %d)\n", length);
-           for (int i = 0; i < 256; i += 16) {
-               debug("\t%#x %#x %#x %#x %#x %#x %#x %#x %#x %#x %#x %#x %#x %#x %#x %#x\n",
-                       network_buf[i + 0], network_buf[i + 1], network_buf[i + 2], network_buf[i + 3],
-                       network_buf[i + 4], network_buf[i + 5], network_buf[i + 6], network_buf[i + 7],
-                       network_buf[i + 8], network_buf[i + 9], network_buf[i + 10], network_buf[i + 11],
-                       network_buf[i + 12], network_buf[i + 13], network_buf[i + 14], network_buf[i + 15]);
-           }
-   }
-//    xTaskCreate(prvInitEnc28j60, "Init", 600, NULL, 3, NULL);
-//    vTaskStartScheduler();
+    uint8_t network_buf[256] = {0};
+    int length;
+    for (;;) {
+        HAL_Delay(1000);
+        debug("Sending arp...\n");
+        enc28j60_send_packet(arp_req, sizeof(arp_req));
+        length = enc28j60_recv_packet(network_buf, sizeof(network_buf));
+        debug("Received response (len: %d)\n", length);
+        for (int i = 0; i < 256; i += 16) {
+            debug("\t%#x %#x %#x %#x %#x %#x %#x %#x %#x %#x %#x %#x %#x %#x %#x %#x\n",
+                    network_buf[i + 0], network_buf[i + 1], network_buf[i + 2], network_buf[i + 3],
+                    network_buf[i + 4], network_buf[i + 5], network_buf[i + 6], network_buf[i + 7],
+                    network_buf[i + 8], network_buf[i + 9], network_buf[i + 10], network_buf[i + 11],
+                    network_buf[i + 12], network_buf[i + 13], network_buf[i + 14], network_buf[i + 15]);
+        }
+    }
+    */
+    xTaskCreate(prvInitEnc28j60, "Init", 600, NULL, 3, NULL);
+    vTaskStartScheduler();
 
     return 0;
 }
