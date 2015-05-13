@@ -190,7 +190,7 @@ uint8_t enc28j60_init(uint8_t *macadr)
     MACON1_RXPAUS|MACON1_MARXEN); // Enable MAC Rx
     enc28j60_wcr(MACON2, 0); // Clear reset
     enc28j60_wcr(MACON3, 
-            MACON3_PADCFG0 | MACON3_PADCFG1 | MACON3_PADCFG2 | // Enable padding,
+            MACON3_PADCFG0 | MACON3_PADCFG2 | // Enable padding and automatic vlan frames recognition
             MACON3_TXCRCEN | MACON3_FRMLNEN | MACON3_FULDPX); // Enable crc & frame len chk
     enc28j60_wcr16(MAMXFL, ENC28J60_MAXFRAME);
     enc28j60_wcr(MABBIPG, 0x15); // Set inter-frame gap
