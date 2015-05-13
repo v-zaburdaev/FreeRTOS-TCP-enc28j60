@@ -11,8 +11,6 @@ static uint8_t enc28j60_txrx_byte(uint8_t data);
 static uint8_t enc28j60_read_op(uint8_t cmd, uint8_t adr);
 static void enc28j60_write_op(uint8_t cmd, uint8_t adr, uint8_t data);
 
-
-
 volatile uint8_t enc28j60_current_bank = 0;
 volatile uint16_t enc28j60_rxrdpt = 0;
 
@@ -72,7 +70,7 @@ uint8_t enc28j60_init(uint8_t *macadr)
     // Initialize MISO
 
 	GPIO_InitStruct.Pin       = GPIO_PIN_14;
-    GPIO_InitStruct.Mode      = GPIO_MODE_AF_PP;    // ICE: official examples show another way of configuration
+    GPIO_InitStruct.Mode      = GPIO_MODE_AF_PP;
     //GPIO_InitStruct.Pull      = GPIO_PULLUP;
     //GPIO_InitStruct.Speed     = GPIO_SPEED_FAST;
     //GPIO_InitStruct.Alternate = GPIO_AF5_SPI2;
@@ -190,7 +188,7 @@ uint8_t enc28j60_init(uint8_t *macadr)
     // Setup MAC
     enc28j60_wcr(MACON1, MACON1_TXPAUS| // Enable flow control
     MACON1_RXPAUS|MACON1_MARXEN); // Enable MAC Rx
-    //enc28j60_wcr(MACON2, 0); // Clear reset
+    enc28j60_wcr(MACON2, 0); // Clear reset
     enc28j60_wcr(MACON3, 
             MACON3_PADCFG0 | MACON3_PADCFG1 | MACON3_PADCFG2 | // Enable padding,
             MACON3_TXCRCEN | MACON3_FRMLNEN | MACON3_FULDPX); // Enable crc & frame len chk
