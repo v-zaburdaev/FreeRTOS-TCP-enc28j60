@@ -6,7 +6,7 @@ extern "C" {
 #endif
 
 #include <stdint.h>
-
+#include "stm32f4xx_hal.h"
 
 //#define ENC28J60_SPI_DDR	DDRB
 //#define ENC28J60_SPI_PORT	PORTB

@@ -81,10 +81,10 @@
 /* Prototype for the function used to print out.  In this case it prints to the
 console before the network is connected then a UDP port after the network has
 connected. */
+#define DEBUG
 #ifdef DEBUG
-    #include <cstdio>
-    
-    #define vLoggingPrintf(format, ...)     std::printf(format,##__VA_ARGS__)
+    #include <stdio.h>
+    #define vLoggingPrintf(format, ...) printf(format,##__VA_ARGS__)
     /*
      * Disable STDOUT buffering to enable printing before a newline 
      * character or buffer flush.
@@ -109,7 +109,7 @@ then FreeRTOS_printf should be set to the function used to print out the
 messages. */
 #define ipconfigHAS_PRINTF			1
 #if( ipconfigHAS_PRINTF == 1 )
-	#define FreeRTOS_printf(X)			vLoggingPrintf X
+	#define FreeRTOS_printf(X)		vLoggingPrintf X
 #endif
 
 /* Define the byte order of the target MCU (the MCU FreeRTOS+TCP is executing

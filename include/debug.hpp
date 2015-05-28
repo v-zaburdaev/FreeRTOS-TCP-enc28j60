@@ -1,9 +1,9 @@
 #ifndef DEBUG_HPP
 #define DEBUG_HPP
     #ifdef DEBUG
-        #include <cstdio>
+        #include <stdio.h>
         
-        #define debug(format, ...)     std::printf(format,##__VA_ARGS__)
+        #define debug(format, ...)     printf(format,##__VA_ARGS__)
         
         /*
          * Disable STDOUT buffering to enable printing before a newline 
