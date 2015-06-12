@@ -78,8 +78,8 @@ debug: CFLAGS   += -ggdb -Og -DDEBUG
 debug: CPPFLAGS += -ggdb -Og -DDEBUG
 debug: proj
 all: proj
-release: CFLAGS   += -ggdb
-release: CPPFLAGS += -ggdb
+release: CFLAGS   += -ggdb -Og
+release: CPPFLAGS += -ggdb -Og
 release: proj
 
 depends: link_needed_lib

@@ -20,30 +20,77 @@ static void enc28j60_soft_reset();
 static uint8_t enc28j60_txrx_byte(uint8_t data);
 static uint8_t enc28j60_read_op(uint8_t cmd, uint8_t adr);
 static void enc28j60_write_op(uint8_t cmd, uint8_t adr, uint8_t data);
-static void prvReceivePacket(void * unused, uint32_t unused2 );
-
+static void prvReceivePacket(void *buf, uint32_t pktlen);
+static void prvSoftTimerInt(void *unused, uint32_t unused2);
 // private global variables definition
 static SPI_HandleTypeDef SpiHandle;
+
+void *pvPortMallocISR( size_t xWantedSize );
 
 volatile uint8_t enc28j60_current_bank = 0;
 volatile uint16_t enc28j60_rxrdpt = 0;
 
 void EXTI2_IRQHandler(void)
 {
-    //if(__HAL_GPIO_EXTI_GET_IT(GPIO_PIN_0) != RESET) {
+//    if(__HAL_GPIO_EXTI_GET_IT(GPIO_PIN_2) != RESET) {
         __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_2);
+
         enc28j60_bfc(EIE, EIE_INTIE); // mask enc28j60 interrupts
 
-        volatile uint8_t eir_flags = enc28j60_rcr(EIR);
         BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-        debug("int: PREV flags_state %#x", eir_flags);
-      //  if(enc28j60_rcr(EPKTCNT)) {
-        if(eir_flags & EIR_PKTIF) {
-            xTimerPendFunctionCallFromISR( prvReceivePacket,
+        volatile uint8_t eir_flags = enc28j60_rcr(EIR);
+
+        if (eir_flags == 0xFF) {
+            //SPI Busy error, delay packet processing
+            if (xTimerPendFunctionCallFromISR( prvSoftTimerInt,
                     NULL,
                     0,
-                    &xHigherPriorityTaskWoken );
+                    &xHigherPriorityTaskWoken ) == pdFALSE) {
+                debug("PANIC: enc28j60: daemon's queue full\n");
+                    while(1);
+            }
+            return;
+        }
+
+        debug("int: PREV flags_state %#x", eir_flags);
+        enc28j60_bfc(EIR, EIR_DMAIF);
+
+        if(eir_flags & EIR_PKTIF) { /* if there is pending packet */
+            // retrieve packet from enc28j60
+            uint8_t *buf = NULL;
+            uint16_t pktlen = 0, rxlen, status, temp;
+
+            enc28j60_wcr16(ERDPT, enc28j60_rxrdpt);
+
+            enc28j60_read_buffer((void *)(&enc28j60_rxrdpt), sizeof(enc28j60_rxrdpt));
+            enc28j60_read_buffer((void *)(&rxlen), sizeof(rxlen));
+            enc28j60_read_buffer((void *)(&status), sizeof(status));
+
+            if(status & 0x80) //success
+            {
+                pktlen = rxlen - 4; //throw out crc
+                buf = pvPortMallocISR(pktlen);
+                if (buf == NULL) {
+                    debug("PANIC: enc28j60: stm32 out of memory\n");
+                    while(1);
+                }
+                enc28j60_read_buffer(buf, pktlen);	
+            }
+
+            // Set Rx read pointer to next packet
+            temp = (enc28j60_rxrdpt - 1) & ENC28J60_BUFEND;
+            enc28j60_wcr16(ERXRDPT, temp);
+
+            // Decrement packet counter
             enc28j60_bfs(ECON2, ECON2_PKTDEC);
+
+            if (xTimerPendFunctionCallFromISR( prvReceivePacket,
+                    buf,
+                    pktlen,
+                    &xHigherPriorityTaskWoken ) == pdFALSE) {
+                debug("PANIC: enc28j60: daemon's queue full\n");
+                    while(1);
+            }
 
         } else if (eir_flags & EIR_TXIF) {
             debug("enc28j60: transmit done\n");
@@ -60,14 +107,20 @@ void EXTI2_IRQHandler(void)
         eir_flags = enc28j60_rcr(EIR);
         debug(" AFTER flags_state %#x\n", eir_flags);
 
-        //portYIELD_FROM_ISR( xHigherPriorityTaskWoken );
+        portYIELD_FROM_ISR( xHigherPriorityTaskWoken );
         enc28j60_bfs(EIE, EIE_INTIE); // unmask enc28j60 interrupts
-    //}
+//    }
 }
 
-
-uint8_t enc28j60_init(uint8_t *macadr)
+void prvSoftTimerInt(void *unused, uint32_t unused2)
 {
+    HAL_Delay(30);
+    EXTI2_IRQHandler();
+
+}
+
+    uint8_t enc28j60_init(uint8_t *macadr)
+    {
 	uint32_t i;
     
     // Initialize clock on SPI and for MISO/MOSI
@@ -131,7 +184,7 @@ uint8_t enc28j60_init(uint8_t *macadr)
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
     IRQn_Type irqn_line = EXTI2_IRQn;
-    HAL_NVIC_SetPriority(irqn_line, 7, 7);
+    HAL_NVIC_SetPriority(irqn_line, 13, 0);
 
     // Initialize SPI
     SpiHandle.Instance               = SPI2;
@@ -239,78 +292,64 @@ uint16_t enc28j60_recv_packet(uint8_t *buf, uint16_t buflen)
 	return len;
 }
 
-void prvReceivePacket(void * unused, uint32_t unused2 )
+void prvReceivePacket(void *buf, uint32_t pktlen)
 {
     xNetworkBufferDescriptor_t *pxBufferDescriptor;
-    /* Used to indicate that xSendEventStructToIPTask() is being called because
-       of an Ethernet receive event. */
     xIPStackEvent_t xRxEvent;
-
-    uint16_t xBytesReceived = 0, rxlen, status, temp;
-    // Set read pointer of enc28j60 to read new packet
-    enc28j60_wcr16(ERDPT, enc28j60_rxrdpt);
-
-    // Read information about packet
-    enc28j60_read_buffer((volatile uint8_t *) &enc28j60_rxrdpt, sizeof(enc28j60_rxrdpt));
-    enc28j60_read_buffer((uint8_t *) &rxlen, sizeof(rxlen));
-    enc28j60_read_buffer((uint8_t *) &status, sizeof(status));
-
-    if(status & 0x80) //success
-    { 
-        // Throw out crc
-        xBytesReceived = rxlen - 4;
-
-        // Allocate buffer for packet
+    size_t xBytesReceived = pktlen;
+    if( xBytesReceived > 0 )
+    {
+        /* Allocate a network buffer descriptor that points to a buffer
+           large enough to hold the received frame.  As this is the simple
+           rather than efficient example the received data will just be copied
+           into this buffer. */
         pxBufferDescriptor = pxGetNetworkBufferWithDescriptor( xBytesReceived, 0 );
 
         if( pxBufferDescriptor != NULL )
         {
-            // Read packet content
-            enc28j60_read_buffer( pxBufferDescriptor->pucEthernetBuffer, xBytesReceived );
+            memcpy(pxBufferDescriptor->pucEthernetBuffer, buf, pktlen);
             pxBufferDescriptor->xDataLength = xBytesReceived;
 
-            // Set enc28j60 Rx read pointer to next packet
-            temp = (enc28j60_rxrdpt - 1) & ENC28J60_BUFEND;
-            enc28j60_wcr16(ERXRDPT, temp);
+            /* The event about to be sent to the TCP/IP is an Rx event. */
+            xRxEvent.eEventType = eNetworkRxEvent;
 
+            /* pvData is used to point to the network buffer descriptor that
+               now references the received data. */
+            xRxEvent.pvData = ( void * ) pxBufferDescriptor;
 
-            /* See if the data contained in the received Ethernet frame needs
-               to be processed.  NOTE! It is preferable to do this in
-               the interrupt service routine itself, which would remove the need
-               to unblock this task for packets that don't need processing. */
-                /* The event about to be sent to the TCP/IP is an Rx event. */
-                xRxEvent.eEventType = eNetworkRxEvent;
+            /* Send the data to the TCP/IP stack. */
+            if( xSendEventStructToIPTask( &xRxEvent, 0 ) == pdFALSE )
+            {
+                /* The buffer could not be sent to the IP task so the buffer
+                   must be released. */
+                vReleaseNetworkBufferAndDescriptor( pxBufferDescriptor );
 
-                /* pvData is used to point to the network buffer descriptor that
-                   now references the received data. */
-                xRxEvent.pvData = ( void * ) pxBufferDescriptor;
-
-                /* Send the data to the TCP/IP stack. */
-                if( xSendEventStructToIPTask( &xRxEvent, 0 ) == pdFALSE )
-                {
-                    /* The buffer could not be sent to the IP task so the buffer
-                       must be released. */
-                    vReleaseNetworkBufferAndDescriptor( pxBufferDescriptor );
-
-                    /* Make a call to the standard trace macro to log the
-                       occurrence. */
-                    iptraceETHERNET_RX_EVENT_LOST();
-                }
-                else
-                {
-                    /* The message was successfully sent to the TCP/IP stack.
-                       Call the standard trace macro to log the occurrence. */
-                    iptraceNETWORK_INTERFACE_RECEIVE();
-                }
+                /* Make a call to the standard trace macro to log the
+                   occurrence. */
+                iptraceETHERNET_RX_EVENT_LOST();
+            }
+            else
+            {
+                /* The message was successfully sent to the TCP/IP stack.
+                   Call the standard trace macro to log the occurrence. */
+                iptraceNETWORK_INTERFACE_RECEIVE();
+            }
         }
         else
         {
-            /* The event was lost because a network buffer was not available.
-               Call the standard trace macro to log the occurrence. */
-            iptraceETHERNET_RX_EVENT_LOST();
+            /* The Ethernet frame can be dropped, but the Ethernet buffer
+               must be released. */
+            vReleaseNetworkBufferAndDescriptor( pxBufferDescriptor );
         }
     }
+    else
+    {
+        /* The event was lost because a network buffer was not available.
+           Call the standard trace macro to log the occurrence. */
+        iptraceETHERNET_RX_EVENT_LOST();
+    }
 }
+
 
 void enc28j60_send_packet(uint8_t *data, uint16_t len)
 {
@@ -468,27 +507,28 @@ static void enc28j60_soft_reset()
 
 static uint8_t enc28j60_txrx_byte(uint8_t data)
 {
-    /*
-	while(SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE)==RESET);
-	SPI_I2S_SendData(SPI2,data);
-
-	while(SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_RXNE)==RESET);
-	return SPI_I2S_ReceiveData(SPI2);
-    */
     uint8_t recv_data;
 
-    switch(HAL_SPI_TransmitReceive(&SpiHandle, &data, &recv_data, 1, 100)) {
+    while(1)
+        switch(HAL_SPI_TransmitReceive(&SpiHandle, &data, &recv_data, 1, 100)) {
         case HAL_OK:  
-            break;  
+            return recv_data;
+        case HAL_BUSY:
+            return 0xFF;
+            break;
         case HAL_TIMEOUT:
-            debug("SPI: transmit/receive timeout occured at %s, line %d .\n", __FILE__, __LINE__);
+            debug("PANIC: SPI: transmit/receive timeout occured at %s, line %d .\n", __FILE__, __LINE__);
+            while(1);
             break;  
         case HAL_ERROR:
-            debug("SPI: transmit/receive error at %s, line %d.\n", __FILE__, __LINE__);
+            debug("PANIC: SPI: transmit/receive error at %s, line %d.\n", __FILE__, __LINE__);
+            while(1);
             break;
         default:
+            debug("PANIC: SPI: transmit/receive WUT HAPPEND at %s, line %d.\n", __FILE__, __LINE__);
+            while(1);
             break;
-    }
+        }
     return recv_data;
 }
 
