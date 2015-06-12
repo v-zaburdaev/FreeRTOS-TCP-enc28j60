@@ -20,12 +20,50 @@ static void enc28j60_soft_reset();
 static uint8_t enc28j60_txrx_byte(uint8_t data);
 static uint8_t enc28j60_read_op(uint8_t cmd, uint8_t adr);
 static void enc28j60_write_op(uint8_t cmd, uint8_t adr, uint8_t data);
+static void prvReceivePacket(void * unused, uint32_t unused2 );
 
 // private global variables definition
 static SPI_HandleTypeDef SpiHandle;
 
 volatile uint8_t enc28j60_current_bank = 0;
 volatile uint16_t enc28j60_rxrdpt = 0;
+
+void EXTI2_IRQHandler(void)
+{
+    //if(__HAL_GPIO_EXTI_GET_IT(GPIO_PIN_0) != RESET) {
+        __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_2);
+        enc28j60_bfc(EIE, EIE_INTIE); // mask enc28j60 interrupts
+
+        volatile uint8_t eir_flags = enc28j60_rcr(EIR);
+        BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+        debug("int: PREV flags_state %#x", eir_flags);
+      //  if(enc28j60_rcr(EPKTCNT)) {
+        if(eir_flags & EIR_PKTIF) {
+            xTimerPendFunctionCallFromISR( prvReceivePacket,
+                    NULL,
+                    0,
+                    &xHigherPriorityTaskWoken );
+            enc28j60_bfs(ECON2, ECON2_PKTDEC);
+
+        } else if (eir_flags & EIR_TXIF) {
+            debug("enc28j60: transmit done\n");
+            enc28j60_bfc(EIR, EIR_TXIF);
+        } else if (eir_flags & EIR_TXERIF) {
+            debug("enc28j60: transmit error !!\n");
+            enc28j60_bfc(EIR, EIR_TXERIF);
+        } else if (eir_flags & EIR_RXERIF) {
+            debug("enc28j60: receive error !!\n");
+            enc28j60_bfc(EIR, EIR_RXERIF);
+        } else {
+            debug("enc28j60: unknown interrupt, we shouldn't be here\n");
+        }
+        eir_flags = enc28j60_rcr(EIR);
+        debug(" AFTER flags_state %#x\n", eir_flags);
+
+        //portYIELD_FROM_ISR( xHigherPriorityTaskWoken );
+        enc28j60_bfs(EIE, EIE_INTIE); // unmask enc28j60 interrupts
+    //}
+}
 
 
 uint8_t enc28j60_init(uint8_t *macadr)
@@ -75,13 +113,25 @@ uint8_t enc28j60_init(uint8_t *macadr)
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
     // Set RESET pin
-	GPIO_InitStruct.Pin       = GPIO_PIN_7;
+	GPIO_InitStruct.Pin       = GPIO_PIN_1;
     GPIO_InitStruct.Mode      = GPIO_MODE_OUTPUT_PP;
     // GPIO_InitStruct.Pull      = GPIO_NOPULL;
     // GPIO_InitStruct.Speed     = GPIO_SPEED_FAST;
     GPIO_InitStruct.Alternate = 0;
 
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+    // Set INTERRUPT pin
+	GPIO_InitStruct.Pin       = GPIO_PIN_2;
+    GPIO_InitStruct.Mode      = GPIO_MODE_IT_FALLING;
+    GPIO_InitStruct.Pull      = GPIO_NOPULL;
+    GPIO_InitStruct.Speed     = GPIO_SPEED_HIGH;
+    GPIO_InitStruct.Alternate = 0;
+
+    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+    IRQn_Type irqn_line = EXTI2_IRQn;
+    HAL_NVIC_SetPriority(irqn_line, 7, 7);
 
     // Initialize SPI
     SpiHandle.Instance               = SPI2;
@@ -107,9 +157,9 @@ uint8_t enc28j60_init(uint8_t *macadr)
 
     enc28j60_release();
     for (i = 0; i < 720000; i++) {
-        HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET);
+        HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET);
     }
-    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);
 
     // Reset ENC28J60
     enc28j60_soft_reset();
@@ -146,9 +196,14 @@ uint8_t enc28j60_init(uint8_t *macadr)
     PHLCON_LBCFG2|PHLCON_LBCFG1|PHLCON_LBCFG0|
     PHLCON_LFRQ0|PHLCON_STRCH);
 
+    // Enable interrupt line
+    HAL_NVIC_EnableIRQ(irqn_line);
+    
+    // Enable enc28j60 receive packet pending interrupt
+    // and transmit and receive error interrupt
+    enc28j60_bfs(EIE, EIE_INTIE | EIE_TXIE | EIE_PKTIE | EIE_TXERIE | EIE_RXERIE);
     // Enable Rx packets
-    //enc28j60_wcr(ERXFCON, 0x9F); // filtering
-    enc28j60_bfc(EIE, EIE_PKTIE | EIE_INTIE);
+    // enc28j60_wcr(ERXFCON, 0x9F); // packet filtering
     enc28j60_bfs(ECON1, ECON1_RXEN);
     
     return 0;
@@ -184,17 +239,98 @@ uint16_t enc28j60_recv_packet(uint8_t *buf, uint16_t buflen)
 	return len;
 }
 
+void prvReceivePacket(void * unused, uint32_t unused2 )
+{
+    xNetworkBufferDescriptor_t *pxBufferDescriptor;
+    /* Used to indicate that xSendEventStructToIPTask() is being called because
+       of an Ethernet receive event. */
+    xIPStackEvent_t xRxEvent;
+
+    uint16_t xBytesReceived = 0, rxlen, status, temp;
+    // Set read pointer of enc28j60 to read new packet
+    enc28j60_wcr16(ERDPT, enc28j60_rxrdpt);
+
+    // Read information about packet
+    enc28j60_read_buffer((volatile uint8_t *) &enc28j60_rxrdpt, sizeof(enc28j60_rxrdpt));
+    enc28j60_read_buffer((uint8_t *) &rxlen, sizeof(rxlen));
+    enc28j60_read_buffer((uint8_t *) &status, sizeof(status));
+
+    if(status & 0x80) //success
+    { 
+        // Throw out crc
+        xBytesReceived = rxlen - 4;
+
+        // Allocate buffer for packet
+        pxBufferDescriptor = pxGetNetworkBufferWithDescriptor( xBytesReceived, 0 );
+
+        if( pxBufferDescriptor != NULL )
+        {
+            // Read packet content
+            enc28j60_read_buffer( pxBufferDescriptor->pucEthernetBuffer, xBytesReceived );
+            pxBufferDescriptor->xDataLength = xBytesReceived;
+
+            // Set enc28j60 Rx read pointer to next packet
+            temp = (enc28j60_rxrdpt - 1) & ENC28J60_BUFEND;
+            enc28j60_wcr16(ERXRDPT, temp);
+
+
+            /* See if the data contained in the received Ethernet frame needs
+               to be processed.  NOTE! It is preferable to do this in
+               the interrupt service routine itself, which would remove the need
+               to unblock this task for packets that don't need processing. */
+                /* The event about to be sent to the TCP/IP is an Rx event. */
+                xRxEvent.eEventType = eNetworkRxEvent;
+
+                /* pvData is used to point to the network buffer descriptor that
+                   now references the received data. */
+                xRxEvent.pvData = ( void * ) pxBufferDescriptor;
+
+                /* Send the data to the TCP/IP stack. */
+                if( xSendEventStructToIPTask( &xRxEvent, 0 ) == pdFALSE )
+                {
+                    /* The buffer could not be sent to the IP task so the buffer
+                       must be released. */
+                    vReleaseNetworkBufferAndDescriptor( pxBufferDescriptor );
+
+                    /* Make a call to the standard trace macro to log the
+                       occurrence. */
+                    iptraceETHERNET_RX_EVENT_LOST();
+                }
+                else
+                {
+                    /* The message was successfully sent to the TCP/IP stack.
+                       Call the standard trace macro to log the occurrence. */
+                    iptraceNETWORK_INTERFACE_RECEIVE();
+                }
+        }
+        else
+        {
+            /* The event was lost because a network buffer was not available.
+               Call the standard trace macro to log the occurrence. */
+            iptraceETHERNET_RX_EVENT_LOST();
+        }
+    }
+}
+
 void enc28j60_send_packet(uint8_t *data, uint16_t len)
 {
+
+    uint32_t tickstart = HAL_GetTick();
 	while(enc28j60_rcr(ECON1) & ECON1_TXRTS)
 	{
 		// TXRTS may not clear - ENC28J60 bug. We must reset
 		// transmit logic in cause of Tx error
+        
 		if(enc28j60_rcr(EIR) & EIR_TXERIF)
 		{
 			enc28j60_bfs(ECON1, ECON1_TXRST);
 			enc28j60_bfc(ECON1, ECON1_TXRST);
 		}
+
+        // If previous packet won't be sended within 100 ms, abort previous packet
+        if((HAL_GetTick() - tickstart) > 100) {
+            enc28j60_bfc(ECON1, ECON1_TXRTS);
+        }
 	}
 
 	enc28j60_wcr16(EWRPT, ENC28J60_TXSTART);
