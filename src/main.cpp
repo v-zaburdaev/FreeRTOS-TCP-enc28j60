@@ -4,11 +4,39 @@
 #include "Leds.hpp"
 #include "Peripheral.hpp"
 
+#include "server.hpp"
+#include "request.hpp"
+#include "response.hpp"
+#include "constants.hpp"
+#include "file_resources.hpp"
+
+#include <string>
+#include <unordered_map>
+
+
 extern int click_counter;
 
 static UBaseType_t ulNextRand=1234;
+static void prvHttpserverTask( void *pvParameters );
 static void prvRecvPacketTask( void *pvParameters );
 static void prvInit( void *pvParameters );
+
+void* operator new (std::size_t n) throw(std::bad_alloc)
+{
+    return pvPortMalloc(n);
+}
+void* operator new[](std::size_t n) throw(std::bad_alloc)
+{
+    return pvPortMalloc(n);
+}
+void  operator delete (void* p) noexcept
+{
+    vPortFree(p);
+}
+void  operator delete[](void* p) noexcept
+{
+    vPortFree(p);
+}
 
 UBaseType_t uxRand( void )
 {
@@ -27,7 +55,8 @@ void vApplicationIPNetworkEventHook( eIPCallbackEvent_t eNetworkEvent )
     if( eNetworkEvent == eNetworkUp )
     {
         debug("vApplicationIP: network up.\n");
-        xTaskCreate(prvPingTask, "Pinging", 500, NULL, 3, NULL);
+        if (xTaskCreate(prvHttpserverTask, "Httpserver", 12000, NULL, 1, NULL) != pdPASS)
+            debug("!! Creation of Httpserver task failed.\n");
     } else if ( eNetworkEvent == eNetworkDown) {
         debug("vApplicationIP: network down.\n");
     }
@@ -60,13 +89,15 @@ int main()
 
     /* Configure the system clock to 168 MHz */
     SystemClock_Config();
-    
 
+    HAL_NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4);
     FreeRTOS_IPInit( ucIPAddress,
                      ucNetMask,
                      ucGatewayAddress,
                      ucDNSServerAddress,
                      ucMACAddress );
+
+
 
     xTaskCreate(prvInit, "Init", 1000, NULL, 3, NULL);
     vTaskStartScheduler();
@@ -143,9 +174,6 @@ void prvRecvPacketTask( void *pvParameters )
                        to be processed.  NOTE! It is preferable to do this in
                        the interrupt service routine itself, which would remove the need
                        to unblock this task for packets that don't need processing. */
-                    if( eConsiderFrameForProcessing( pxBufferDescriptor->pucEthernetBuffer )
-                            == eProcessBuffer )
-                    {
                         /* The event about to be sent to the TCP/IP is an Rx event. */
                         xRxEvent.eEventType = eNetworkRxEvent;
 
@@ -170,13 +198,6 @@ void prvRecvPacketTask( void *pvParameters )
                                Call the standard trace macro to log the occurrence. */
                             iptraceNETWORK_INTERFACE_RECEIVE();
                         }
-                    }
-                    else
-                    {
-                        /* The Ethernet frame can be dropped, but the Ethernet buffer
-                           must be released. */
-                        vReleaseNetworkBufferAndDescriptor( pxBufferDescriptor );
-                    }
                 }
                 else
                 {
@@ -198,9 +219,97 @@ void prvPingTask(void *pvParameters)
     }
 }
 
+void prvHttpserverTask( void *pvParameters )
+{
+    std::unordered_map<std::string, Html_file*> file_umap = populate_file_umap();
+
+    Server::create(80);
+
+    debug("Listening...\n");
+    Server::listen();
+
+    // main loop
+    while (1) {
+        debug("Wait for connetion...\n");
+
+        xSocket_t clientid = Server::accept();
+        if (clientid != NULL) {
+            debug("Connetion established...\n");
+
+            std::string request = Server::receive(clientid);
+
+            if (!request.empty()) {
+                debug("== Received message: ==\n");
+
+                Request_data req_data = Request::handle_request(request);
+                debug("== Parsed args: ==\n%d %s\n", req_data.req_type, req_data.url.c_str());
+
+
+                if (file_umap.count(req_data.url) == 0) {
+                    std::string response_str = Response::generate_response(*file_umap["/404.html"], Response::type::NOT_FOUND);
+                    debug("<< Sending message 404: >>..");
+                    Server::send(clientid, response_str);
+                    debug("...Done\n");
+                } else {
+                    std::string response_str = Response::generate_response(*file_umap[req_data.url], Response::type::OK);
+                    debug("<< Sending message: >>..");
+                    Server::send(clientid, response_str);
+                    debug("...Done\n");
+                }
+            }
+            FreeRTOS_shutdown(clientid, FREERTOS_SHUT_RDWR);
+            FreeRTOS_closesocket(clientid);
+        }
+
+    }
+}
+
+void prvCheckFlagsTask(void *args)
+{
+    volatile uint8_t pktcnt, flags;
+    while (1) {
+        pktcnt = enc28j60_rcr(EPKTCNT);
+        flags = enc28j60_rcr(EIR);
+        debug("encPacketCNT: %d, flags: %x\n", pktcnt, flags);
+        vTaskDelay(2500);
+        //        __HAL_GPIO_EXTI_GENERATE_SWIT(GPIO_PIN_0);
+    }
+}
+
+extern "C" { 
+    void EXTI0_IRQHandler()
+    {
+        if(__HAL_GPIO_EXTI_GET_IT(GPIO_PIN_0) != RESET) {
+            __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_0);
+            static uint32_t tickstart = 0;
+            if((HAL_GetTick() - tickstart) > 200) {
+                debug("Software int...");
+                __HAL_GPIO_EXTI_GENERATE_SWIT(EXTI0_IRQn);
+                tickstart = HAL_GetTick();
+            }
+        }
+    }
+}
+
 static void prvInit( void *pvParameters )
 {
     vTaskSuspendAll();
+
+	GPIO_InitTypeDef GPIO_InitStruct;
+
+    // Initialize button int
+	GPIO_InitStruct.Pin       = GPIO_PIN_0;
+    GPIO_InitStruct.Mode      = GPIO_MODE_IT_RISING;
+    GPIO_InitStruct.Pull      = GPIO_NOPULL;
+    GPIO_InitStruct.Speed     = GPIO_SPEED_LOW;
+    GPIO_InitStruct.Alternate = 0;
+
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    IRQn_Type irqn_line = EXTI0_IRQn;
+    HAL_NVIC_SetPriority(irqn_line, 7, 7);
+    HAL_NVIC_EnableIRQ(irqn_line);
+
     debug("enc28j60: init\n");
     enc28j60_init(ucMACAddress);
     uint8_t revision_id = 0;
@@ -210,9 +319,7 @@ static void prvInit( void *pvParameters )
             enc28j60_rcr(MAADR5), enc28j60_rcr(MAADR4), enc28j60_rcr(MAADR3),
             enc28j60_rcr(MAADR2), enc28j60_rcr(MAADR1), enc28j60_rcr(MAADR0),
             enc28j60_rcr(ERXFCON));
-
-    xTaskCreate(prvRecvPacketTask, "Recv_packet", 5000, NULL, 3, NULL);
     xTaskResumeAll();
-
+    //xTaskCreate(prvCheckFlagsTask, "Check", 1000, NULL, 2, NULL);
     vTaskDelete(NULL);
 }
