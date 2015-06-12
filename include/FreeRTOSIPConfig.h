@@ -81,7 +81,6 @@
 /* Prototype for the function used to print out.  In this case it prints to the
 console before the network is connected then a UDP port after the network has
 connected. */
-#define DEBUG
 #ifdef DEBUG
     #include <stdio.h>
     #define vLoggingPrintf(format, ...) printf(format,##__VA_ARGS__)
@@ -90,9 +89,11 @@ connected. */
      * character or buffer flush.
      */
     #define ipconfigHAS_DEBUG_PRINTF	1
+    #define ipconfigHAS_PRINTF			1
 #else
     #define vLoggingPrintf(format, ...)
     #define ipconfigHAS_DEBUG_PRINTF	0
+    #define ipconfigHAS_PRINTF			0
 #endif /* DEBUG */
 //extern void vLoggingPrintf( const char *pcFormatString, ... );
 
@@ -107,7 +108,6 @@ out the debugging messages. */
 FreeRTOS_netstat() command, and ping replies.  If ipconfigHAS_PRINTF is set to 1
 then FreeRTOS_printf should be set to the function used to print out the
 messages. */
-#define ipconfigHAS_PRINTF			1
 #if( ipconfigHAS_PRINTF == 1 )
 	#define FreeRTOS_printf(X)		vLoggingPrintf X
 #endif
@@ -288,7 +288,7 @@ be divisible by 8. */
 
 /* Set ipconfigUSE_DNS to 1 to include a basic DNS client/resolver.  DNS is used
 through the FreeRTOS_gethostbyname() API function. */
-#define ipconfigUSE_DNS			1
+#define ipconfigUSE_DNS			0
 
 /* If ipconfigREPLY_TO_INCOMING_PINGS is set to 1 then the IP stack will
 generate replies to incoming ICMP echo (ping) requests. */
@@ -315,7 +315,7 @@ perform the filtering instead (it is much less efficient for the stack to do it
 because the packet will already have been passed into the stack).  If the
 Ethernet driver does all the necessary filtering in hardware then software
 filtering can be removed by using a value other than 1 or 0. */
-#define ipconfigETHERNET_DRIVER_FILTERS_FRAME_TYPES	1
+#define ipconfigETHERNET_DRIVER_FILTERS_FRAME_TYPES	0
 
 /* Advanced only: in order to access 32-bit fields in the IP packets with
 32-bit memory instructions, all packets will be stored 32-bit-aligned, plus 16-bits.
