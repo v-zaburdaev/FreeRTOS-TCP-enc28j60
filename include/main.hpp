@@ -5,9 +5,12 @@
 #include "debug.hpp"
 #include "Leds.hpp"
 #include "interrupts.hpp"
+extern "C" {
 #include "FreeRTOS.h"
 #include "FreeRTOS_IP.h"
 #include "FreeRTOS_IP_Private.h"
+#include "FreeRTOS_Sockets.h"
+}
 #include "task.h"
 #include "handlers.hpp"
 #include "enc28j60.h"
