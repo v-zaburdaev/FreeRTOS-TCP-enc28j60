@@ -4,10 +4,11 @@ PROJ_NAME=hal
 
 # sources' directories
 SRCS         := $(wildcard src/*.c) $(wildcard lib/FreeRTOS/*.c)
-SRCSCPP      := $(wildcard src/*.cpp)
+SRCSCPP      := $(wildcard src/*.cpp) $(wildcard lib/httpserver/src/*.cpp)
 
 # headers' directories
-CINCS += -Iinclude -Ilib/stm32cubef4/include -Ilib/include/stm32cubef4/Legacy -Ilib/FreeRTOS/include
+CINCS := -Iinclude -Ilib/stm32cubef4/include -Ilib/stm32cubef4/include/Legacy
+CINCS += -Ilib/FreeRTOS/include -Ilib/rapidjson/include/rapidjson -Ilib/httpserver/include
 
 ###
 # TODO: Probably we don't need this section
@@ -40,23 +41,25 @@ OBJCOPY=arm-none-eabi-objcopy
 
 
 # C compiler's options
-CFLAGS := -Wall -std=c11 -Os
+CFLAGS := -Wall -std=c11
 CFLAGS += -mlittle-endian -mthumb -mcpu=cortex-m4 -mthumb-interwork
 CFLAGS += -mfpu=fpv4-sp-d16 -mfloat-abi=softfp
+CFLAGS += -fdata-sections -ffunction-sections
 CFLAGS += $(DEFINES)
 
 # Cpp compiler's settings
 CPP=arm-none-eabi-g++
-CPPFLAGS := -Wall -std=c++11 -Os
+CPPFLAGS := -Wall -std=c++11
 CPPFLAGS += -mlittle-endian -mthumb -mcpu=cortex-m4 -mthumb-interwork
 CPPFLAGS += -mfpu=fpv4-sp-d16 -mfloat-abi=softfp
+CPPFLAGS += -fdata-sections -ffunction-sections
 CPPFLAGS += $(DEFINES)
 
 # linker's scripts
 LDSRCS    := ldscripts/libs.ld ldscripts/mem.ld ldscripts/sections.ld
 
 # linker's settings
-LDFLAGS := $(LDSRCS:%=-T%) -specs nosys.specs --specs=rdimon.specs -lc -lrdimon
+LDFLAGS := $(LDSRCS:%=-T%) -specs=rdimon.specs -Wl,--gc-sections
 
 
 # advanced settings
@@ -71,12 +74,12 @@ LDFLAGS := $(LDSRCS:%=-T%) -specs nosys.specs --specs=rdimon.specs -lc -lrdimon
 
 .SUFFIXES:
 
-debug: CFLAGS   += -g
-debug: CPPFLAGS += -g -DDEBUG
+debug: CFLAGS   += -ggdb -Og -DDEBUG
+debug: CPPFLAGS += -ggdb -Og -DDEBUG
 debug: proj
 all: proj
-release: CFLAGS   += -Os
-release: CPPFLAGS += -Os
+release: CFLAGS   += -ggdb
+release: CPPFLAGS += -ggdb
 release: proj
 
 depends: link_needed_lib
@@ -125,7 +128,7 @@ proj: $(PROJ_NAME).elf
 
 $(PROJ_NAME).elf: $(OBJS) $(OBJSLIB) $(OBJSCPP)
 	@echo "  (LDCPP) -o $@ $^"
-	@$(CPP) $(CPPFLAGS) $(LDFLAGS) $(CINCS) -o $@ $^ src/startup_stm32f407xx.s $(LDLIBS)
+	@$(CPP) -o $@ $^ src/startup_stm32f407xx.s $(CPPFLAGS) $(LDFLAGS) $(CINCS)  $(LDLIBS)
 	$(OBJCOPY) -O ihex $(PROJ_NAME).elf $(PROJ_NAME).hex
 	$(OBJCOPY) -O binary $(PROJ_NAME).elf $(PROJ_NAME).bin
 
@@ -148,9 +151,11 @@ $(BUILDDIR):
 	mkdir -p $(OBJSDIR)/src
 	mkdir -p $(OBJSDIR)/lib/stm32cubef4
 	mkdir -p $(OBJSDIR)/lib/FreeRTOS
+	mkdir -p $(OBJSDIR)/lib/httpserver/src
 	mkdir -p $(DEPSDIR)/src
 	mkdir -p $(DEPSDIR)/lib/stm32cubef4
 	mkdir -p $(DEPSDIR)/lib/FreeRTOS
+	mkdir -p $(DEPSDIR)/lib/httpserver/src
 	
 
 
