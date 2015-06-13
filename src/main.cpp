@@ -31,7 +31,7 @@ void  operator delete[](void* p) noexcept
 }
 
 // TCP Stack - IP configuration
-static uint8_t ucMACAddress[ 6 ] = { 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff };
+uint8_t ucMACAddress[ 6 ] = { 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff };
 static const uint8_t ucIPAddress[ 4 ] = { 192, 168, 0, 2 };
 static const uint8_t ucNetMask[ 4 ] = { 255, 255, 255, 0 };
 static const uint8_t ucGatewayAddress[ 4 ] = { 192, 168, 0, 100 };
