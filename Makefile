@@ -3,12 +3,16 @@
 PROJ_NAME=hal
 
 # sources' directories
-SRCS         := $(wildcard src/*.c) $(wildcard lib/FreeRTOS/*.c)
+SRCS         := $(wildcard src/*.c) $(wildcard lib/FreeRTOS/*.c) $(wildcard lib/enc28j60/*.c)
 SRCSCPP      := $(wildcard src/*.cpp) $(wildcard lib/httpserver/src/*.cpp)
 
 # headers' directories
-CINCS := -Iinclude -Ilib/stm32cubef4/include -Ilib/stm32cubef4/include/Legacy
-CINCS += -Ilib/FreeRTOS/include -Ilib/rapidjson/include/rapidjson -Ilib/httpserver/include
+CINCS := -Iinclude -Ilib/stm32cubef4/include -Ilib/stm32cubef4/include/Legacy 
+CINCS += -Ilib/FreeRTOS/include 
+CINCS += -Ilib/enc28j60/include
+CINCS += -Ilib/httpserver/include
+CINCS += -Ilib/rapidjson/include/rapidjson
+
 
 ###
 # TODO: Probably we don't need this section
@@ -151,10 +155,12 @@ $(BUILDDIR):
 	mkdir -p $(OBJSDIR)/src
 	mkdir -p $(OBJSDIR)/lib/stm32cubef4
 	mkdir -p $(OBJSDIR)/lib/FreeRTOS
+	mkdir -p $(OBJSDIR)/lib/enc28j60
 	mkdir -p $(OBJSDIR)/lib/httpserver/src
 	mkdir -p $(DEPSDIR)/src
 	mkdir -p $(DEPSDIR)/lib/stm32cubef4
 	mkdir -p $(DEPSDIR)/lib/FreeRTOS
+	mkdir -p $(DEPSDIR)/lib/enc28j60
 	mkdir -p $(DEPSDIR)/lib/httpserver/src
 	
 
