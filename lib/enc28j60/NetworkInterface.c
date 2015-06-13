@@ -24,7 +24,7 @@ BaseType_t xNetworkInterfaceOutput( xNetworkBufferDescriptor_t * const pxDescrip
 {
     enc28j60_send_packet(pxDescriptor->pucEthernetBuffer, pxDescriptor->xDataLength );
     
-    debug("Packet sended...\n");
+    debug("FreeRTOS: Packet forwarded to driver for transmiting...\n");
     /* Call the standard trace macro to log the send event. */
     iptraceNETWORK_INTERFACE_TRANSMIT();
 
